@@ -1,0 +1,189 @@
+name: Test and lint
+
+on:
+  workflow_call:
+    inputs:
+      git-ref:
+      # Git reference to check out in every job
+        type: string
+        default: ''
+      versions:
+      # JSON array of Python versions to use for the testing strategy matrix.
+      # If a `coverage-command` is specified, the unit test job will run the `unittest-command`
+      # for all but the last version in this array and the `coverage-command` for the last only.
+      # The type checking and linting jobs will only run with the last version in this array,
+      # unless `typecheck-all-versions` and `lint-all-versions` respectively are set to `true`.
+        type: string
+        default: '["3.11"]'
+      cache:
+      # Passed to `actions/setup-python`
+        type: string
+        default: 'pip'
+      cache-dependency-path:
+      # Passed to `actions/setup-python`
+        type: string
+        default: 'pyproject.toml'
+      unittest-command:
+      # Command to execute to run regular unit tests
+        type: string
+        default: 'python -m unittest'
+      coverage-command:
+      # Command to execute to run unit tests and calculate coverage.
+      # If provided, the unit test job will run this command
+      # for the last Python version in `versions` instead of the `unittest-command`;
+      # successful execution of this command must return a coverage percentage and nothing else
+        type: string
+        default: ''
+      unittest-requirements:
+      # If passed, the command `pip install <unittest-requirements>` is executed before testing
+        type: string
+        default: ''
+      typecheck-command:
+      # Command to execute to run type checks. If omitted, the type checking job will be skipped.
+        type: string
+        default: ''
+      typecheck-requirements:
+      # If passed, the command `pip install <unittest-requirements>` is executed before type checking
+        type: string
+        default: ''
+      typecheck-all-versions:
+      # If set to `true`, type checking is done for each Python version specified in `versions`;
+      # if `false` (default), the job only runs with the last version specified in `versions`.
+        type: boolean
+        default: false
+      lint-command:
+      # Command to execute to run linters. If omitted, the linting job will be skipped.
+        type: string
+        default: ''
+      lint-requirements:
+      # If passed, the command `pip install <unittest-requirements>` is executed before linting
+        type: string
+        default: ''
+      lint-all-versions:
+      # If set to `true`, linting is done for each Python version specified in `versions`;
+      # if `false` (default), the job only runs with the last version specified in `versions`.
+        type: boolean
+        default: false
+
+jobs:
+  version-prep:
+    name: Prepare version parameters
+    runs-on: ubuntu-latest
+    outputs:
+      coverage-version: ${{ steps.get-last-version.outputs.last-python-version }}
+      typecheck-versions: ${{ steps.get-typecheck-versions.outputs.typecheck-versions }}
+      lint-versions: ${{ steps.get-lint-versions.outputs.lint-versions }}
+    steps:
+    - id: get-last-version
+      run: echo "last-python-version=$( echo '${{ inputs.versions }}' | jq -r '.[-1]' )" >> $GITHUB_OUTPUT
+
+    - id: get-typecheck-versions
+      run: |
+        if [[ ${{ inputs.typecheck-all-versions }} == true ]]; then
+          versions='${{ inputs.versions }}';
+        else
+          versions='["${{ steps.get-last-version.outputs.last-python-version }}"]';
+        fi
+        echo "typecheck-versions=${versions}" >> $GITHUB_OUTPUT
+
+    - id: get-lint-versions
+      run: |
+        if [[ ${{ inputs.lint-all-versions }} == true ]]; then
+          versions='${{ inputs.versions }}';
+        else
+          versions='["${{ steps.get-last-version.outputs.last-python-version }}"]';
+        fi
+        echo "lint-versions=${versions}" >> $GITHUB_OUTPUT
+
+  unit-test:
+    name: Unit testing (Python ${{ matrix.python-version }})
+    needs: version-prep
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(inputs.versions) }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.git-ref }}
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Install dependencies
+      if: ${{ inputs.unittest-requirements != '' }}
+      run: |
+        pip install -U pip
+        pip install ${{ inputs.unittest-requirements }}
+
+    - name: Run unit tests for Python ${{ matrix.python-version }}
+      if: ${{ inputs.coverage-command == '' || matrix.python-version != needs.version-prep.outputs.coverage-version }}
+      run: ${{ inputs.unittest-command }}
+
+    - name: Run unit test coverage command for Python ${{ needs.version-prep.outputs.coverage-version }} and save output
+      if: ${{ inputs.coverage-command != '' && matrix.python-version == needs.version-prep.outputs.coverage-version }}
+      run: |
+        output=$(${{ inputs.coverage-command }})
+        [[ $? -eq 0 ]] && echo "coverage=${output}" >> $GITHUB_ENV
+
+    outputs:
+      coverage: ${{ env.coverage }}
+
+  typecheck:
+    name: Static type checking (Python ${{ matrix.python-version }})
+    needs: version-prep
+    if: inputs.typecheck-command != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(needs.version-prep.outputs.typecheck-versions) }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.git-ref }}
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Install dependencies
+      if: ${{ inputs.typecheck-requirements != '' }}
+      run: |
+        pip install -U pip
+        pip install ${{ inputs.typecheck-requirements }}
+
+    - name: Run type checks
+      run: ${{ inputs.typecheck-command }}
+
+  lint:
+    name: Linting (Python ${{ matrix.python-version }})
+    needs: version-prep
+    if: inputs.lint-command != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(needs.version-prep.outputs.lint-versions) }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.git-ref }}
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Install dependencies
+      if: ${{ inputs.lint-requirements != '' }}
+      run: |
+        pip install -U pip
+        pip install ${{ inputs.lint-requirements }}
+
+    - name: Run type checks
+      run: ${{ inputs.lint-command }}
