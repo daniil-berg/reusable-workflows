@@ -43,7 +43,7 @@ on:
         type: string
         default: ''
       typecheck-requirements:
-      # If passed, the command `pip install <unittest-requirements>` is executed before type checking
+      # If passed, the command `pip install <typecheck-requirements>` is executed before type checking
         type: string
         default: ''
       typecheck-all-versions:
@@ -56,7 +56,7 @@ on:
         type: string
         default: ''
       lint-requirements:
-      # If passed, the command `pip install <unittest-requirements>` is executed before linting
+      # If passed, the command `pip install <lint-requirements>` is executed before linting
         type: string
         default: ''
       lint-all-versions:
