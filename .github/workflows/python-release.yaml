@@ -32,8 +32,8 @@ on:
         description: 'Github API token to use to create the release'
         required: true
       publish-token:
-        description: 'PyPI API token to use to publish the package'
-        required: true
+        description: 'PyPI API token to use to publish the package; if omitted, the publish job is skipped.'
+        required: false
 
 jobs:
   build:
@@ -80,7 +80,7 @@ jobs:
   publish:
     name: Publish to package index
     needs: build
-    if: ${{ needs.build.outputs.prerelease == 'false' }}
+    if: ${{ secrets.publish-token != '' && needs.build.outputs.prerelease == 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v3
