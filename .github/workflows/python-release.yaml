@@ -27,6 +27,30 @@ on:
         description: 'The command `pip install <build-requirements>` is executed before building, unless this is empty'
         type: string
         default: 'build==0.10.0'
+      tag-as-release-title:
+        description: 'If `true` (default), the tag itself becomes the release title and 
+                      the entire tag message including the subject becomes the release body.
+                      If `false`, the tag subject becomes the release title and
+                      the rest of the message becomes the body.'
+        type: boolean
+        default: true
+      prerelease:
+        description: 'Set to `true` to create a prerelease, to `false` to create a normal release, or
+                      `auto` (default) to create a prerelease, if the tag name matches the `prerelease-pattern`.'
+        type: string
+        default: 'auto'
+      prerelease-pattern:
+        description: 'If the tag name matches this pattern, it would be inferred to be a prerelease'
+        type: string
+        default: 'v*.*.*-*'
+      publish-verbose:
+        description: 'Whether to show verbose output during the publishing step'
+        type: boolean
+        default: false
+      pypi-repository-url:
+        description: 'The repository (package index) URL to upload the package to'
+        type: string
+        default: 'https://upload.pypi.org/legacy/'
     secrets:
       release-token:
         description: 'Github API token to use to create the release; if omitted, the release step is skipped.'
@@ -94,8 +118,9 @@ jobs:
       uses: spenserblack/actions-tag-to-release@v2.0.0
       with:
         token: ${{ secrets.release-token }}
-        tag-as-title: true
-        prerelease: auto
+        tag-as-title: ${{ inputs.tag-as-release-title }}
+        prerelease: ${{ inputs.prerelease }}
+        prerelease-pattern: ${{ inputs.prerelease-pattern }}
 
     outputs:
       prerelease: ${{ steps.tag-to-release.outputs.prerelease }}
@@ -105,7 +130,7 @@ jobs:
     needs:
       - check-secrets
       - build
-    if: ${{ needs.check-secret.outputs.publish-token-provided == 'true' && needs.build.outputs.prerelease == 'false' }}
+    if: ${{ needs.check-secrets.outputs.publish-token-provided == 'true' && needs.build.outputs.prerelease == 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v3
@@ -116,4 +141,6 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.8.5
         with:
+          repository-url: ${{ inputs.pypi-repository-url }}
           password: ${{ secrets.publish-token }}
+          verbose: ${{ secrets.publish-verbose }}
