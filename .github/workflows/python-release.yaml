@@ -29,15 +29,37 @@ on:
         default: 'build==0.10.0'
     secrets:
       release-token:
-        description: 'Github API token to use to create the release'
-        required: true
+        description: 'Github API token to use to create the release; if omitted, the release step is skipped.'
+        required: false
       publish-token:
         description: 'PyPI API token to use to publish the package; if omitted, the publish job is skipped.'
         required: false
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release-token-check
+        run: |
+          if [[ "${{ secrets.release-token }}" != '' ]]; then
+            echo "provided=true" >> $GITHUB_OUTPUT;
+          else
+            echo "provided=false" >> $GITHUB_OUTPUT;
+          fi
+      - id: publish-token-check
+        run: |
+          if [[ "${{ secrets.publish-token }}" != '' ]]; then
+            echo "provided=true" >> $GITHUB_OUTPUT;
+          else
+            echo "provided=false" >> $GITHUB_OUTPUT;
+          fi
+    outputs:
+      release-token-provided: ${{ steps.release-token-check.outputs.provided }}
+      publish-token-provided: ${{ steps.publish-token-check.outputs.provided }}
+
   build:
     name: Build release
+    needs: check-secrets
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -68,6 +90,7 @@ jobs:
 
     - name: Create release on Github
       id: tag-to-release
+      if: ${{ needs.check-secrets.outputs.release-token-provided == 'true' }}
       uses: spenserblack/actions-tag-to-release@v2.0.0
       with:
         token: ${{ secrets.release-token }}
@@ -79,8 +102,10 @@ jobs:
 
   publish:
     name: Publish to package index
-    needs: build
-    if: ${{ secrets.publish-token != '' && needs.build.outputs.prerelease == 'false' }}
+    needs:
+      - check-secrets
+      - build
+    if: ${{ needs.check-secret.outputs.publish-token-provided == 'true' && needs.build.outputs.prerelease == 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v3
