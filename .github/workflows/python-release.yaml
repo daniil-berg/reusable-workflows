@@ -1,4 +1,4 @@
-name: Build, release and publish
+name: Build, release, publish
 
 on:
   workflow_call:
@@ -61,6 +61,7 @@ on:
 
 jobs:
   check-secrets:
+    name: Checking secrets
     runs-on: ubuntu-latest
     steps:
       - id: release-token-check
@@ -82,7 +83,7 @@ jobs:
       publish-token-provided: ${{ steps.publish-token-check.outputs.provided }}
 
   build:
-    name: Build release
+    name: Creating release
     needs: check-secrets
     permissions:
       contents: write
@@ -126,7 +127,7 @@ jobs:
       prerelease: ${{ steps.tag-to-release.outputs.prerelease }}
 
   publish:
-    name: Publish to package index
+    name: Publishing package
     needs:
       - check-secrets
       - build

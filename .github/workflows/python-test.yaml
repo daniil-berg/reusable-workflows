@@ -67,7 +67,7 @@ on:
 
 jobs:
   version-prep:
-    name: Prepare version parameters
+    name: Preparing version parameters
     runs-on: ubuntu-latest
     outputs:
       coverage-version: ${{ steps.get-last-version.outputs.last-python-version }}
