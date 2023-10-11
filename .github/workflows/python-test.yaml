@@ -64,6 +64,10 @@ on:
                       if `false` (default), the job only runs with the last version specified in `versions`.'
         type: boolean
         default: false
+    outputs:
+      coverage:
+        description: "Unit test coverage percentage"
+        value: ${{ jobs.unit-test.outputs.coverage }}
 
 jobs:
   version-prep:
