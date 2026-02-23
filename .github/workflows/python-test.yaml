@@ -8,13 +8,15 @@ on:
         type: string
         default: ''
       versions:
+        # Last updated: 2026-02-23
         description: 'JSON array of Python versions to use for the testing strategy matrix.
+                      Defaults to the three latest minor versions. (Currently `["3.12", "3.13", "3.14"]`)
                       If a `coverage-command` is specified, the unit test job will run the `unittest-command`
-                      for all but the last version in this array and the `coverage-command` for the last only.
-                      The type checking and linting jobs will only run with the last version in this array,
+                      for all but the highest version in this array and the `coverage-command` for the highest only.
+                      The type checking and linting jobs will only run with the highest version in this array,
                       unless `typecheck-all-versions` and `lint-all-versions` respectively are set to `true`.'
         type: string
-        default: '["3.11"]'
+        default: '["3.12", "3.13", "3.14"]'
       cache:
         description: 'Passed to `actions/setup-python`'
         type: string
@@ -30,7 +32,7 @@ on:
       coverage-command:
         description: 'Command to execute to run unit tests and calculate coverage.
                       If provided, the unit test job will run this command
-                      for the last Python version in `versions` instead of the `unittest-command`;
+                      for the highest Python version in `versions` instead of the `unittest-command`;
                       successful execution of this command must return a coverage percentage and nothing else.'
         type: string
         default: ''
@@ -48,7 +50,7 @@ on:
         default: ''
       typecheck-all-versions:
         description: 'If set to `true`, type checking is done for each Python version specified in `versions`;
-                      if `false` (default), the job only runs with the last version specified in `versions`.'
+                      if `false` (default), the job only runs with the highest version specified in `versions`.'
         type: boolean
         default: false
       lint-command:
@@ -61,7 +63,7 @@ on:
         default: ''
       lint-all-versions:
         description: 'If set to `true`, linting is done for each Python version specified in `versions`;
-                      if `false` (default), the job only runs with the last version specified in `versions`.'
+                      if `false` (default), the job only runs with the highest version specified in `versions`.'
         type: boolean
         default: false
     outputs:
@@ -74,19 +76,27 @@ jobs:
     name: Preparing version parameters
     runs-on: ubuntu-latest
     outputs:
-      coverage-version: ${{ steps.get-last-version.outputs.last-python-version }}
+      coverage-version: ${{ steps.get-latest-version.outputs.latest-python-version }}
       typecheck-versions: ${{ steps.get-typecheck-versions.outputs.typecheck-versions }}
       lint-versions: ${{ steps.get-lint-versions.outputs.lint-versions }}
     steps:
-    - id: get-last-version
-      run: echo "last-python-version=$( echo '${{ inputs.versions }}' | jq -r '.[-1]' )" >> $GITHUB_OUTPUT
+    - id: get-latest-version
+      run: |
+        VERSIONS='${{ inputs.versions }}'
+        INVALID=$(echo "$VERSIONS" | jq -r '.[] | select(test("^\\d+\\.\\d+(\\.\\d+)?$") | not)')
+        if [ -n "$INVALID" ]; then
+          echo "Invalid Python version(s) found: $INVALID"
+          exit 1
+        fi
+        LATEST=$(echo "$VERSIONS" | jq -r '[.[] | split(".") | map(tonumber)] | sort | last | map(tostring) | join(".")')
+        echo "latest-python-version=$LATEST" >> $GITHUB_OUTPUT
 
     - id: get-typecheck-versions
       run: |
         if [[ ${{ inputs.typecheck-all-versions }} == true ]]; then
           versions='${{ inputs.versions }}';
         else
-          versions='["${{ steps.get-last-version.outputs.last-python-version }}"]';
+          versions='["${{ steps.get-latest-version.outputs.latest-python-version }}"]';
         fi
         echo "typecheck-versions=${versions}" >> $GITHUB_OUTPUT
 
@@ -95,7 +105,7 @@ jobs:
         if [[ ${{ inputs.lint-all-versions }} == true ]]; then
           versions='${{ inputs.versions }}';
         else
-          versions='["${{ steps.get-last-version.outputs.last-python-version }}"]';
+          versions='["${{ steps.get-latest-version.outputs.latest-python-version }}"]';
         fi
         echo "lint-versions=${versions}" >> $GITHUB_OUTPUT
 
@@ -107,11 +117,11 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(inputs.versions) }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
       with:
         ref: ${{ inputs.git-ref }}
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
         cache: ${{ inputs.cache }}
@@ -145,11 +155,11 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(needs.version-prep.outputs.typecheck-versions) }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
       with:
         ref: ${{ inputs.git-ref }}
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
         cache: ${{ inputs.cache }}
@@ -173,11 +183,11 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(needs.version-prep.outputs.lint-versions) }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
       with:
         ref: ${{ inputs.git-ref }}
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
         cache: ${{ inputs.cache }}

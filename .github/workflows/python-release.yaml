@@ -8,9 +8,10 @@ on:
         type: string
         default: ''
       python-version:
+        # Last updated: 2026-02-23
         description: 'Python version to use for building and distributing'
         type: string
-        default: '3.11'
+        default: '3.14'
       cache:
         description: 'Passed to `actions/setup-python`'
         type: string
@@ -24,9 +25,10 @@ on:
         type: string
         default: 'python -m build'
       build-requirements:
+        # Last updated: 2026-02-23
         description: 'The command `pip install <build-requirements>` is executed before building, unless this is empty'
         type: string
-        default: 'build==0.10.0'
+        default: 'build==1.4.0'
       tag-as-release-title:
         description: 'If `true` (default), the tag itself becomes the release title and 
                       the entire tag message including the subject becomes the release body.
@@ -89,11 +91,11 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
       with:
         ref: ${{ inputs.git-ref }}
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
         cache: ${{ inputs.cache }}
@@ -108,7 +110,7 @@ jobs:
     - name: Build distributable
       run: ${{ inputs.build-command }}
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v6
       with:
         name: dist
         path: dist/*
@@ -116,7 +118,7 @@ jobs:
     - name: Create release on Github
       id: tag-to-release
       if: ${{ needs.check-secrets.outputs.release-token-provided == 'true' }}
-      uses: spenserblack/actions-tag-to-release@v2.0.0
+      uses: spenserblack/actions-tag-to-release@v3.0.0
       with:
         token: ${{ secrets.release-token }}
         tag-as-title: ${{ inputs.tag-as-release-title }}
@@ -134,13 +136,13 @@ jobs:
     if: ${{ needs.check-secrets.outputs.publish-token-provided == 'true' && needs.build.outputs.prerelease == 'false' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.5
+        uses: pypa/gh-action-pypi-publish@v1.13
         with:
           repository-url: ${{ inputs.pypi-repository-url }}
           password: ${{ secrets.publish-token }}
