@@ -136,7 +136,7 @@ jobs:
     if: ${{ needs.check-secrets.outputs.publish-token-provided == 'true' && needs.build.outputs.prerelease == 'false' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
