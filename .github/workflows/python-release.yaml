@@ -110,7 +110,7 @@ jobs:
     - name: Build distributable
       run: ${{ inputs.build-command }}
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: dist
         path: dist/*
