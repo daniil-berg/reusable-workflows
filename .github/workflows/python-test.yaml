@@ -117,7 +117,7 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(inputs.versions) }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.git-ref }}
 
@@ -155,7 +155,7 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(needs.version-prep.outputs.typecheck-versions) }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.git-ref }}
 
@@ -183,7 +183,7 @@ jobs:
       matrix:
         python-version: ${{ fromJSON(needs.version-prep.outputs.lint-versions) }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.git-ref }}
 
